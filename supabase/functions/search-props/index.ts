@@ -20,6 +20,7 @@ interface ProductResult {
   ratingCount: number | null;
   merchantSoldBy: string | null;
   fulfilledByAmazon: boolean;
+  inStock: boolean;
 }
 
 function getTomorrow(): string {
@@ -45,7 +46,78 @@ function extractASIN(url: string): string {
 }
 
 function isAmazonProductUrl(url: string): boolean {
-  return url.includes("amazon.co.uk") || url.includes("amazon.com");
+  if (!url.includes("amazon.co.uk") && !url.includes("amazon.com")) {
+    return false;
+  }
+  return Boolean(extractASIN(url));
+}
+
+function getString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function pickFirstString(...values: unknown[]): string {
+  for (const value of values) {
+    const text = getString(value);
+    if (text) return text;
+  }
+  return "";
+}
+
+function parsePrice(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const text = getString(value);
+  if (!text) return 0;
+
+  const match = text.match(/(?:£|GBP\s?)(\d+[\d,]*\.?\d{0,2})|(\d+[\d,]*\.?\d{0,2})\s?(?:GBP|pounds?)/i);
+  const raw = (match?.[1] || match?.[2] || "").replace(/,/g, "");
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function extractPriceFromSearchResult(result: Record<string, unknown>): number {
+  const meta = (result.metadata || {}) as Record<string, unknown>;
+  return (
+    parsePrice(result.price) ||
+    parsePrice(meta.price) ||
+    parsePrice(meta["product:price:amount"]) ||
+    parsePrice(meta["og:price:amount"]) ||
+    parsePrice(result.description)
+  );
+}
+
+function extractImageFromSearchResult(result: Record<string, unknown>): string {
+  const meta = (result.metadata || {}) as Record<string, unknown>;
+  return pickFirstString(
+    result.image,
+    result.imageUrl,
+    meta.image,
+    meta["og:image"],
+    meta["twitter:image"],
+    meta["product:image"],
+  );
+}
+
+function isLikelyInStock(...values: string[]): boolean {
+  const text = values.join(" ").toLowerCase();
+  if (!text) return true;
+
+  const outOfStockIndicators = [
+    "currently unavailable",
+    "out of stock",
+    "temporarily out of stock",
+    "unavailable",
+    "no longer available",
+  ];
+
+  return !outOfStockIndicators.some(indicator => text.includes(indicator));
+}
+
+function canonicalProductUrl(url: string, asin: string): string {
+  if (url.includes("amazon.co.uk")) {
+    return `https://www.amazon.co.uk/dp/${asin}`;
+  }
+  return `https://www.amazon.com/dp/${asin}`;
 }
 
 function dedupeQuery(propName: string, description?: string): string {
@@ -126,9 +198,17 @@ Deno.serve(async (req) => {
 
     // Filter to Amazon product URLs and extract ASINs
     const amazonResults = results
-      .filter((r: { url?: string }) => {
+      .filter((r: { url?: string; title?: string; description?: string; metadata?: { title?: string; description?: string } }) => {
         const url = r.url || "";
-        return isAmazonProductUrl(url) && extractASIN(url);
+        return (
+          isAmazonProductUrl(url) &&
+          isLikelyInStock(
+            r.title || "",
+            r.description || "",
+            r.metadata?.title || "",
+            r.metadata?.description || "",
+          )
+        );
       })
       .slice(0, 5);
 
@@ -137,16 +217,19 @@ Deno.serve(async (req) => {
     if (amazonResults.length === 0) {
       // If no Amazon product URLs found, try to use search metadata directly
       const fallbackProducts: ProductResult[] = results
-        .filter((r: { url?: string }) => isAmazonProductUrl(r.url || ""))
+        .filter((r: { url?: string; title?: string; description?: string; metadata?: { description?: string } }) => (
+          isAmazonProductUrl(r.url || "") &&
+          isLikelyInStock(r.title || "", r.description || "", r.metadata?.description || "")
+        ))
         .slice(0, 3)
         .map((r: { url?: string; title?: string; description?: string; metadata?: { title?: string } }) => ({
           id: crypto.randomUUID(),
           provider: "firecrawl",
-          asin: extractASIN(r.url || "") || "unknown",
+          asin: extractASIN(r.url || ""),
           title: r.title || r.metadata?.title || query,
-          url: r.url || "",
-          imageUrl: "",
-          priceAmount: 0,
+          url: canonicalProductUrl(r.url || "", extractASIN(r.url || "")),
+          imageUrl: extractImageFromSearchResult(r as Record<string, unknown>),
+          priceAmount: extractPriceFromSearchResult(r as Record<string, unknown>),
           priceCurrency: "GBP",
           isPrime: false,
           isNextDayConfirmed: false,
@@ -155,6 +238,7 @@ Deno.serve(async (req) => {
           ratingCount: null,
           merchantSoldBy: null,
           fulfilledByAmazon: false,
+          inStock: true,
         }));
 
       if (fallbackProducts.length > 0) {
@@ -203,6 +287,7 @@ Deno.serve(async (req) => {
                     imageUrl: { type: "string", description: "Main product image URL (https://...)" },
                     isPrime: { type: "boolean", description: "Whether Prime delivery is available" },
                     seller: { type: "string", description: "Sold by / seller name" },
+                    availability: { type: "string", description: "Availability text, e.g. In stock or Currently unavailable" },
                   },
                   required: ["title"],
                 },
@@ -221,9 +306,9 @@ Deno.serve(async (req) => {
             provider: "firecrawl",
             asin,
             title: result.title || result.metadata?.title || query,
-            url: `https://www.amazon.co.uk/dp/${asin}`,
-            imageUrl: "",
-            priceAmount: 0,
+            url: canonicalProductUrl(url, asin),
+            imageUrl: extractImageFromSearchResult(result as Record<string, unknown>),
+            priceAmount: extractPriceFromSearchResult(result as Record<string, unknown>),
             priceCurrency: "GBP",
             isPrime: false,
             isNextDayConfirmed: false,
@@ -232,6 +317,7 @@ Deno.serve(async (req) => {
             ratingCount: null,
             merchantSoldBy: null,
             fulfilledByAmazon: false,
+            inStock: true,
           });
           continue;
         }
@@ -239,16 +325,27 @@ Deno.serve(async (req) => {
         const scrapeData = await scrapeResponse.json();
         const product = scrapeData?.data?.json || scrapeData?.json || {};
 
-        console.log(`Scraped ${asin}: title="${(product.title || "").slice(0, 60)}" price=${product.price}`);
+        const availabilityText = getString(product.availability);
+        const inStock = isLikelyInStock(availabilityText);
+
+        if (!inStock) {
+          console.log(`Skipping ${asin} because it appears out of stock: ${availabilityText}`);
+          continue;
+        }
+
+        const scrapedPrice = parsePrice(product.price) || parsePrice(product.priceText);
+        const searchPrice = extractPriceFromSearchResult(result as Record<string, unknown>);
+
+        console.log(`Scraped ${asin}: title="${(product.title || "").slice(0, 60)}" price=${scrapedPrice || searchPrice}`);
 
         products.push({
           id: crypto.randomUUID(),
           provider: "firecrawl",
           asin,
           title: product.title || result.title || result.metadata?.title || query,
-          url: `https://www.amazon.co.uk/dp/${asin}`,
-          imageUrl: product.imageUrl || "",
-          priceAmount: Number(product.price) || 0,
+          url: canonicalProductUrl(url, asin),
+          imageUrl: pickFirstString(product.imageUrl, extractImageFromSearchResult(result as Record<string, unknown>)),
+          priceAmount: scrapedPrice || searchPrice,
           priceCurrency: "GBP",
           isPrime: Boolean(product.isPrime),
           isNextDayConfirmed: Boolean(product.isPrime),
@@ -257,6 +354,7 @@ Deno.serve(async (req) => {
           ratingCount: product.ratingCount ? Number(product.ratingCount) : null,
           merchantSoldBy: product.seller || null,
           fulfilledByAmazon: Boolean(product.isPrime),
+          inStock,
         });
 
         if (products.length >= 3) break;
@@ -267,9 +365,9 @@ Deno.serve(async (req) => {
           provider: "firecrawl",
           asin,
           title: result.title || result.metadata?.title || query,
-          url: `https://www.amazon.co.uk/dp/${asin}`,
-          imageUrl: "",
-          priceAmount: 0,
+          url: canonicalProductUrl(url, asin),
+          imageUrl: extractImageFromSearchResult(result as Record<string, unknown>),
+          priceAmount: extractPriceFromSearchResult(result as Record<string, unknown>),
           priceCurrency: "GBP",
           isPrime: false,
           isNextDayConfirmed: false,
@@ -278,6 +376,7 @@ Deno.serve(async (req) => {
           ratingCount: null,
           merchantSoldBy: null,
           fulfilledByAmazon: false,
+          inStock: true,
         });
       }
     }
@@ -290,7 +389,7 @@ Deno.serve(async (req) => {
       return (b.ratingStars ?? 0) - (a.ratingStars ?? 0);
     });
 
-    const top3 = products.slice(0, 3);
+    const top3 = products.filter(product => product.inStock).slice(0, 3);
     console.log(`Returning ${top3.length} products`);
 
     return new Response(

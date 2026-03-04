@@ -131,14 +131,17 @@ export function PropOptionsModal({ prop, open, onOpenChange }: Props) {
                   )}
 
                   <img
-                    src={option.imageUrl}
+                    src={option.imageUrl || '/placeholder.svg'}
                     alt={option.title}
                     className="w-full h-28 object-cover rounded-md mb-2"
+                    loading="lazy"
                   />
 
                   <p className="text-xs font-medium line-clamp-2 mb-1">{option.title}</p>
 
-                  <p className="text-lg font-bold text-primary">£{option.priceAmount.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-primary">
+                    {option.priceAmount > 0 ? `£${option.priceAmount.toFixed(2)}` : 'Price unavailable'}
+                  </p>
 
                   {option.isPrime && (
                     <Badge className="bg-primary/15 text-primary text-[10px] mt-1">✓ Prime</Badge>
