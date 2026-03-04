@@ -133,12 +133,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           prop.searchQueryOverride || undefined
         );
 
-        const options: PropOption[] = result.options.map(r => ({
-          ...r,
-          propId: prop.id,
-          selected: false,
-          createdAt: new Date().toISOString(),
-        }));
+        const options: PropOption[] = result.options
+          .filter(r => r.inStock !== false)
+          .map(r => ({
+            ...r,
+            propId: prop.id,
+            selected: false,
+            createdAt: new Date().toISOString(),
+          }));
 
         dispatch({ type: 'SET_PROP_OPTIONS', payload: { propId: prop.id, options } });
         dispatch({

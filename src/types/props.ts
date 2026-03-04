@@ -41,6 +41,7 @@ export interface PropOption {
   ratingCount: number | null;
   merchantSoldBy: string | null;
   fulfilledByAmazon: boolean;
+  inStock?: boolean;
   selected: boolean;
   createdAt: string;
 }
