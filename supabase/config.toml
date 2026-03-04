@@ -1,0 +1,4 @@
+project_id = "jnphejdzuvdzfxuiatjr"
+
+[functions.search-props]
+verify_jwt = false
