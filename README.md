@@ -37,7 +37,7 @@ This runs TypeScript validation, linting, tests and the production build.
 
 ## Deployment
 
-Pushes to `main` trigger `.github/workflows/deploy-pages.yml`. The workflow builds the Vite application and deploys it to GitHub Pages.
+Every push to `main` builds the app and publishes the static output to the `gh-pages` branch. A second Pages workflow is retained for repositories configured to use GitHub Actions as their Pages source.
 
 Expected public address:
 
