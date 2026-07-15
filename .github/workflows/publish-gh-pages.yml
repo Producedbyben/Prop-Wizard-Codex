@@ -1,0 +1,38 @@
+name: Publish gh-pages branch
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages-publish
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_PROJECT_ID: jnphejdzuvdzfxuiatjr
+      VITE_SUPABASE_URL: https://jnphejdzuvdzfxuiatjr.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpucGhlamR6dXZkemZ4dWlhdGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NDc0NDYsImV4cCI6MjA4ODAyMzQ0Nn0.GDjMlWWWxHZskjMpQ0iHNmHGGcuwzr65BgKhqlr2ONg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: cp dist/index.html dist/404.html
+      - name: Publish static site
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
+          enable_jekyll: false
