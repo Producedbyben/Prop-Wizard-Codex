@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Prop Pilot</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f5f5;background:#0c0d0f}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#272b31 0,#111318 38%,#090a0c 100%)}button,input,select,textarea{font:inherit}.shell{max-width:1220px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:24px}.brand{display:flex;gap:14px;align-items:center}.mark{width:48px;height:48px;border-radius:14px;background:#f7c843;color:#111;display:grid;place-items:center;font-size:24px;font-weight:900;box-shadow:0 10px 30px #0008}.brand h1{margin:0;font-size:26px}.brand p{margin:4px 0 0;color:#9da3ad}.actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid #343943;background:#1b1e24;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}.btn:hover{background:#242832}.primary{background:#f7c843;color:#171717;border-color:#f7c843;font-weight:800}.grid{display:grid;grid-template-columns:310px 1fr;gap:20px}.panel{background:#15171b;border:1px solid #292d34;border-radius:16px;box-shadow:0 18px 50px #0005}.side{padding:18px;height:fit-content}.side h2,.main h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:#aeb4be;margin:0 0 14px}.field{display:grid;gap:7px;margin-bottom:13px}.field label{font-size:12px;color:#9299a4}.field input,.field textarea,.field select,.cell input,.cell select{width:100%;background:#0e1013;color:#fff;border:1px solid #313640;border-radius:9px;padding:10px}.field textarea{min-height:82px;resize:vertical}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.stat{padding:13px;background:#0f1114;border-radius:11px;border:1px solid #282c33}.stat b{display:block;font-size:22px}.stat span{font-size:11px;color:#8f96a1}.main{overflow:hidden}.mainhead{display:flex;justify-content:space-between;align-items:center;padding:18px;border-bottom:1px solid #292d34}.filters{display:flex;gap:8px}.filters input,.filters select{background:#0e1013;color:#fff;border:1px solid #313640;border-radius:9px;padding:9px}.tablewrap{overflow:auto}.table{min-width:900px}.row{display:grid;grid-template-columns:34px 2fr 1fr 1fr 1fr 110px 72px;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid #242830}.row.head{font-size:11px;text-transform:uppercase;color:#868e99;background:#111318}.row.done{opacity:.48}.check{width:20px;height:20px}.name{font-weight:700}.sub{font-size:12px;color:#858d98;margin-top:4px}.price{text-align:right}.del{background:none;border:0;color:#e27777;cursor:pointer;font-size:18px}.empty{padding:56px;text-align:center;color:#8c939e}.notice{font-size:12px;color:#858d98;line-height:1.5}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#282d35;color:#cbd1d9;font-size:11px}@media(max-width:800px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.shell{padding:16px}.filters{width:100%;flex-wrap:wrap}.filters input{flex:1}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top"><div class="brand"><div class="mark">P</div><div><h1>Prop Pilot</h1><p>Fast prop sourcing and production tracking</p></div></div><div class="actions"><button class="btn" id="exportBtn">Export CSV</button><button class="btn" id="clearBtn">New project</button><button class="btn primary" id="addBtn">+ Add prop</button></div></header>
+<div class="grid">
+<aside class="panel side">
+<h2>Project</h2>
+<div class="field"><label>Project name</label><input id="projectName" placeholder="Campaign or production" /></div>
+<div class="field"><label>Client</label><input id="client" placeholder="Client or agency" /></div>
+<div class="field"><label>Shoot date</label><input id="shootDate" type="date" /></div>
+<div class="field"><label>Delivery location</label><input id="location" placeholder="Studio, office or unit base" /></div>
+<div class="field"><label>Project notes</label><textarea id="notes" placeholder="Access, approvals, delivery instructions..."></textarea></div>
+<div class="stats"><div class="stat"><b id="countStat">0</b><span>Total props</span></div><div class="stat"><b id="budgetStat">£0</b><span>Estimated spend</span></div><div class="stat"><b id="readyStat">0%</b><span>Ready</span></div><div class="stat"><b id="urgentStat">0</b><span>Urgent</span></div></div>
+<p class="notice">This public version saves privately in your browser. No account is required and nothing is uploaded.</p>
+</aside>
+<main class="panel main">
+<div class="mainhead"><h2 style="margin:0">Prop list</h2><div class="filters"><input id="search" placeholder="Search props" /><select id="statusFilter"><option value="all">All statuses</option><option>Needed</option><option>Sourcing</option><option>Ordered</option><option>Ready</option></select></div></div>
+<div class="tablewrap"><div class="table"><div class="row head"><div></div><div>Prop</div><div>Category</div><div>Priority</div><div>Status</div><div class="price">Budget</div><div></div></div><div id="rows"></div></div></div>
+</main>
+</div>
+</div>
+<script>
+const KEY='prop-pilot-public-v1';
+const defaults={projectName:'',client:'',shootDate:'',location:'',notes:'',props:[]};
+let data=load();
+function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return structuredClone(defaults)}}
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+const $=id=>document.getElementById(id);
+['projectName','client','shootDate','location','notes'].forEach(id=>{const el=$(id);el.value=data[id]||'';el.addEventListener('input',()=>{data[id]=el.value;localStorage.setItem(KEY,JSON.stringify(data))})});
+function addProp(){data.props.unshift({id:crypto.randomUUID(),name:'New prop',detail:'',category:'General',priority:'Normal',status:'Needed',budget:0,done:false});save();setTimeout(()=>document.querySelector('[data-name]')?.focus(),0)}
+function update(id,key,value){const p=data.props.find(x=>x.id===id);if(!p)return;p[key]=key==='budget'?Number(value||0):value;save()}
+function removeProp(id){data.props=data.props.filter(x=>x.id!==id);save()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function render(){const q=$('search').value.toLowerCase(),filter=$('statusFilter').value;const props=data.props.filter(p=>(filter==='all'||p.status===filter)&&(`${p.name} ${p.detail} ${p.category}`).toLowerCase().includes(q));$('rows').innerHTML=props.length?props.map(p=>`<div class="row ${p.done?'done':''}"><input class="check" type="checkbox" ${p.done?'checked':''} onchange="update('${p.id}','done',this.checked)"><div class="cell"><input data-name value="${esc(p.name)}" onchange="update('${p.id}','name',this.value)"><input style="margin-top:6px" placeholder="Notes or specification" value="${esc(p.detail)}" onchange="update('${p.id}','detail',this.value)"></div><div class="cell"><input value="${esc(p.category)}" onchange="update('${p.id}','category',this.value)"></div><div class="cell"><select onchange="update('${p.id}','priority',this.value)">${['Low','Normal','High','Urgent'].map(x=>`<option ${p.priority===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="cell"><select onchange="update('${p.id}','status',this.value)">${['Needed','Sourcing','Ordered','Ready'].map(x=>`<option ${p.status===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="cell"><input class="price" type="number" min="0" step="0.01" value="${p.budget||''}" onchange="update('${p.id}','budget',this.value)"></div><button class="del" onclick="removeProp('${p.id}')">×</button></div>`).join(''):'<div class="empty">No props yet. Add the first item to begin.</div>';
+const total=data.props.reduce((n,p)=>n+(Number(p.budget)||0),0),ready=data.props.filter(p=>p.status==='Ready'||p.done).length;$('countStat').textContent=data.props.length;$('budgetStat').textContent=new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(total);$('readyStat').textContent=data.props.length?Math.round(ready/data.props.length*100)+'%':'0%';$('urgentStat').textContent=data.props.filter(p=>p.priority==='Urgent').length}
+$('addBtn').onclick=addProp;$('search').oninput=render;$('statusFilter').onchange=render;$('clearBtn').onclick=()=>{if(confirm('Start a new project and clear the current local data?')){data=structuredClone(defaults);localStorage.removeItem(KEY);location.reload()}};
+$('exportBtn').onclick=()=>{const rows=[['Project',data.projectName],['Client',data.client],['Shoot date',data.shootDate],[],['Prop','Detail','Category','Priority','Status','Budget']];data.props.forEach(p=>rows.push([p.name,p.detail,p.category,p.priority,p.status,p.budget]));const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=(data.projectName||'prop-pilot')+'.csv';a.click()};
+window.update=update;window.removeProp=removeProp;render();
+</script>
+</body>
+</html>
